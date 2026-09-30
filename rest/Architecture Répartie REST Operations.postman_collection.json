@@ -1,0 +1,251 @@
+{
+  "info": {
+    "_postman_id": "cd1c09e0-446b-4b11-966c-d261e92b22a2",
+    "name": "Architecture Répartie REST Operations",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "58352988",
+    "_collection_link": "https://go.postman.co/collection/58352988-cd1c09e0-446b-4b11-966c-d261e92b22a2?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "01 - POST Addition - 201",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status code is 201\", function () {\r\n    pm.response.to.have.status(201);\r\n});\r\n\r\npm.test(\"Response contains an operation ID\", function () {\r\n    const json = pm.response.json();\r\n    pm.expect(json.id).to.exist;\r\n});\r\n\r\npm.test(\"Result is correct\", function () {\r\n    const json = pm.response.json();\r\n    pm.expect(json.result).to.eql(11);\r\n});\r\n\r\npm.test(\"Location header exists\", function () {\r\n    pm.expect(pm.response.headers.get(\"Location\")).to.exist;\r\n});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n    \"type\": \"ADD\",\r\n    \"a\": 4,\r\n    \"b\": 7\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://localhost:8080/operations",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8080",
+          "path": [
+            "operations"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "02 - POST Division par zéro - 422",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status code is 422\", function () {\r\n    pm.response.to.have.status(422);\r\n});\r\n\r\npm.test(\"Error message is present\", function () {\r\n    const json = pm.response.json();\r\n    pm.expect(json.error).to.exist;\r\n});\r\n\r\npm.test(\"Error concerns division by zero\", function () {\r\n    const json = pm.response.json();\r\n    pm.expect(json.error).to.include(\"Division par zéro\");\r\n});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n    \"type\": \"DIV\",\r\n    \"a\": 10,\r\n    \"b\": 0\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://localhost:8080/operations",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8080",
+          "path": [
+            "operations"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "03 - POST Champ manquant - 400",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status code is 400\", function () {\r\n    pm.response.to.have.status(400);\r\n});\r\n\r\npm.test(\"Error message is present\", function () {\r\n    const json = pm.response.json();\r\n    pm.expect(json.error).to.exist;\r\n});\r\n\r\npm.test(\"Error concerns required fields\", function () {\r\n    const json = pm.response.json();\r\n    pm.expect(json.error).to.include(\"obligatoires\");\r\n});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n    \"a\": 10,\r\n    \"b\": 5\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://localhost:8080/operations",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8080",
+          "path": [
+            "operations"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "04 - GET Toutes les opérations - 200",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {\r\n    pm.response.to.have.status(200);\r\n});\r\n\r\npm.test(\"Response is an array\", function () {\r\n    const json = pm.response.json();\r\n    pm.expect(json).to.be.an(\"array\");\r\n});\r\n\r\npm.test(\"At least one operation exists\", function () {\r\n    const json = pm.response.json();\r\n    pm.expect(json.length).to.be.above(0);\r\n});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8080/operations",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8080",
+          "path": [
+            "operations"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "05 - GET Opération existante - 200",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {\r\n    pm.response.to.have.status(200);\r\n});\r\n\r\npm.test(\"Operation has an ID\", function () {\r\n    const json = pm.response.json();\r\n    pm.expect(json.id).to.exist;\r\n});\r\n\r\npm.test(\"Operation has a result\", function () {\r\n    const json = pm.response.json();\r\n    pm.expect(json.result).to.exist;\r\n});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8080/operations/1",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8080",
+          "path": [
+            "operations",
+            "1"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "06 - GET Opération inexistante - 404",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status code is 404\", function () {\r\n    pm.response.to.have.status(404);\r\n});\r\n\r\npm.test(\"Error message is present\", function () {\r\n    const json = pm.response.json();\r\n    pm.expect(json.error).to.exist;\r\n});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8080/operations/999",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8080",
+          "path": [
+            "operations",
+            "999"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "07 - GET Même opération - Idempotence",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {\r\n    pm.response.to.have.status(200);\r\n});\r\n\r\npm.test(\"Operation remains unchanged\", function () {\r\n    const json = pm.response.json();\r\n\r\n    pm.expect(json.id).to.exist;\r\n    pm.expect(json.type).to.exist;\r\n    pm.expect(json.result).to.exist;\r\n    pm.expect(json.timestamp).to.exist;\r\n});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8080/operations/1",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8080",
+          "path": [
+            "operations",
+            "1"
+          ]
+        }
+      },
+      "response": []
+    }
+  ]
+}
