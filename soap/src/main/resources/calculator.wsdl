@@ -1,0 +1,263 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<definitions
+        xmlns="http://schemas.xmlsoap.org/wsdl/"
+        xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/"
+        xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+        xmlns:tns="http://nelly.com/calculator"
+        targetNamespace="http://nelly.com/calculator"
+        name="CalculatorService">
+
+    <!-- ========================= -->
+    <!-- TYPES DE DONNÉES           -->
+    <!-- ========================= -->
+
+    <types>
+        <xsd:schema
+                targetNamespace="http://nelly.com/calculator"
+                elementFormDefault="qualified">
+
+            <xsd:element name="addRequest">
+                <xsd:complexType>
+                    <xsd:sequence>
+                        <xsd:element name="a" type="xsd:double"/>
+                        <xsd:element name="b" type="xsd:double"/>
+                    </xsd:sequence>
+                </xsd:complexType>
+            </xsd:element>
+
+            <xsd:element name="addResponse">
+                <xsd:complexType>
+                    <xsd:sequence>
+                        <xsd:element name="result" type="xsd:double"/>
+                    </xsd:sequence>
+                </xsd:complexType>
+            </xsd:element>
+
+            <xsd:element name="subRequest">
+                <xsd:complexType>
+                    <xsd:sequence>
+                        <xsd:element name="a" type="xsd:double"/>
+                        <xsd:element name="b" type="xsd:double"/>
+                    </xsd:sequence>
+                </xsd:complexType>
+            </xsd:element>
+
+            <xsd:element name="subResponse">
+                <xsd:complexType>
+                    <xsd:sequence>
+                        <xsd:element name="result" type="xsd:double"/>
+                    </xsd:sequence>
+                </xsd:complexType>
+            </xsd:element>
+
+            <xsd:element name="mulRequest">
+                <xsd:complexType>
+                    <xsd:sequence>
+                        <xsd:element name="a" type="xsd:double"/>
+                        <xsd:element name="b" type="xsd:double"/>
+                    </xsd:sequence>
+                </xsd:complexType>
+            </xsd:element>
+
+            <xsd:element name="mulResponse">
+                <xsd:complexType>
+                    <xsd:sequence>
+                        <xsd:element name="result" type="xsd:double"/>
+                    </xsd:sequence>
+                </xsd:complexType>
+            </xsd:element>
+
+            <xsd:element name="divRequest">
+                <xsd:complexType>
+                    <xsd:sequence>
+                        <xsd:element name="a" type="xsd:double"/>
+                        <xsd:element name="b" type="xsd:double"/>
+                    </xsd:sequence>
+                </xsd:complexType>
+            </xsd:element>
+
+            <xsd:element name="divResponse">
+                <xsd:complexType>
+                    <xsd:sequence>
+                        <xsd:element name="result" type="xsd:double"/>
+                    </xsd:sequence>
+                </xsd:complexType>
+            </xsd:element>
+
+            <xsd:element name="getHistoryRequest"/>
+
+            <xsd:element name="getHistoryResponse">
+                <xsd:complexType>
+                    <xsd:sequence>
+                        <xsd:element
+                                name="operation"
+                                type="xsd:string"
+                                minOccurs="0"
+                                maxOccurs="unbounded"/>
+                    </xsd:sequence>
+                </xsd:complexType>
+            </xsd:element>
+
+        </xsd:schema>
+    </types>
+
+    <!-- ========================= -->
+    <!-- MESSAGES                   -->
+    <!-- ========================= -->
+
+    <message name="AddRequest">
+        <part name="parameters" element="tns:addRequest"/>
+    </message>
+
+    <message name="AddResponse">
+        <part name="parameters" element="tns:addResponse"/>
+    </message>
+
+    <message name="SubRequest">
+        <part name="parameters" element="tns:subRequest"/>
+    </message>
+
+    <message name="SubResponse">
+        <part name="parameters" element="tns:subResponse"/>
+    </message>
+
+    <message name="MulRequest">
+        <part name="parameters" element="tns:mulRequest"/>
+    </message>
+
+    <message name="MulResponse">
+        <part name="parameters" element="tns:mulResponse"/>
+    </message>
+
+    <message name="DivRequest">
+        <part name="parameters" element="tns:divRequest"/>
+    </message>
+
+    <message name="DivResponse">
+        <part name="parameters" element="tns:divResponse"/>
+    </message>
+
+    <message name="GetHistoryRequest">
+        <part name="parameters" element="tns:getHistoryRequest"/>
+    </message>
+
+    <message name="GetHistoryResponse">
+        <part name="parameters" element="tns:getHistoryResponse"/>
+    </message>
+
+    <!-- ========================= -->
+    <!-- PORT TYPE                  -->
+    <!-- ========================= -->
+
+    <portType name="CalculatorPortType">
+
+        <operation name="add">
+            <input message="tns:AddRequest"/>
+            <output message="tns:AddResponse"/>
+        </operation>
+
+        <operation name="sub">
+            <input message="tns:SubRequest"/>
+            <output message="tns:SubResponse"/>
+        </operation>
+
+        <operation name="mul">
+            <input message="tns:MulRequest"/>
+            <output message="tns:MulResponse"/>
+        </operation>
+
+        <operation name="div">
+            <input message="tns:DivRequest"/>
+            <output message="tns:DivResponse"/>
+        </operation>
+
+        <operation name="getHistory">
+            <input message="tns:GetHistoryRequest"/>
+            <output message="tns:GetHistoryResponse"/>
+        </operation>
+
+    </portType>
+
+    <!-- ========================= -->
+    <!-- BINDING                   -->
+    <!-- ========================= -->
+
+    <binding
+            name="CalculatorSoapBinding"
+            type="tns:CalculatorPortType">
+
+        <soap:binding
+                style="document"
+                transport="http://schemas.xmlsoap.org/soap/http"/>
+
+        <operation name="add">
+            <soap:operation soapAction="add"/>
+            <input>
+                <soap:body use="literal"/>
+            </input>
+            <output>
+                <soap:body use="literal"/>
+            </output>
+        </operation>
+
+        <operation name="sub">
+            <soap:operation soapAction="sub"/>
+            <input>
+                <soap:body use="literal"/>
+            </input>
+            <output>
+                <soap:body use="literal"/>
+            </output>
+        </operation>
+
+        <operation name="mul">
+            <soap:operation soapAction="mul"/>
+            <input>
+                <soap:body use="literal"/>
+            </input>
+            <output>
+                <soap:body use="literal"/>
+            </output>
+        </operation>
+
+        <operation name="div">
+            <soap:operation soapAction="div"/>
+            <input>
+                <soap:body use="literal"/>
+            </input>
+            <output>
+                <soap:body use="literal"/>
+            </output>
+        </operation>
+
+        <operation name="getHistory">
+            <soap:operation soapAction="getHistory"/>
+            <input>
+                <soap:body use="literal"/>
+            </input>
+            <output>
+                <soap:body use="literal"/>
+            </output>
+        </operation>
+
+    </binding>
+
+    <!-- ========================= -->
+    <!-- SERVICE                    -->
+    <!-- ========================= -->
+
+    <service name="CalculatorService">
+
+        <port
+                name="CalculatorPort"
+                binding="tns:CalculatorSoapBinding">
+
+            <soap:address
+                    location="http://localhost:8080/ws/calculator"/>
+
+        </port>
+
+    </service>
+
+</definitions>
