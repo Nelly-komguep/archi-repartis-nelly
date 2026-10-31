@@ -1,4 +1,4 @@
-# Comparatif RMI vs REST
+# Comparatif polyglotte RMI, REST, Événementiel
 
 ## 1. Objectif
 
@@ -13,6 +13,8 @@ Les deux services permettent notamment de réaliser les opérations :
 * consultation de l'historique des opérations.
 
 La comparaison porte sur le couplage, la lisibilité du contrat, les performances mesurées, la gestion des erreurs et les moyens de test.
+
+Depuis la séance 7, une troisième implémentation événementielle (RabbitMQ, module `/evenementiel`) complète la comparaison.
 
 ---
 
@@ -293,29 +295,73 @@ Dans notre projet, la collection Postman complète donc la conception REST et le
 
 ---
 
-## 8. Synthèse
+## 8. Troisième paradigme : l'événementiel (séance 7)
 
-| Critère                        | RMI                               | REST                                |
-| ------------------------------ | --------------------------------- | ----------------------------------- |
-| Communication                  | Appels de méthodes distantes      | HTTP                                |
-| Format principal               | Objets/classes Java               | JSON                                |
-| Dépendance au langage          | Forte dépendance à Java           | Indépendant du langage côté client  |
-| Contrat                        | Interface Java                    | Ressources + HTTP + JSON            |
-| Gestion des erreurs            | Exceptions Java / RemoteException | Codes HTTP + JSON                   |
-| Test avec outils HTTP          | Non natif                         | Oui                                 |
-| Performance mesurée dans ce TP | 0,733777 ms/appel                 | 5,966458 ms/appel                   |
-| Interopérabilité               | Principalement environnement Java | Clients HTTP de différents langages |
+Le module `/evenementiel` réimplémente le service avec RabbitMQ : le producteur publie
+`OperationDemandee` sur l'échange `calcul.demandes`, `CalculConsommateur` calcule et publie
+`OperationCalculee` sur `calcul.resultats`, et `AuditConsommateur` journalise chaque résultat.
+
+### 8.1 Couplage temporel
+
+Le producteur n'a pas besoin que le consommateur soit disponible. Test réalisé : consommateur
+arrêté, publication de `ADD 1 1`. Le producteur n'a reçu aucun résultat en 5 s, mais la demande
+a attendu dans la file durable `calcul.demandes.calculateur`. Au redémarrage, le consommateur l'a
+traitée (`ADD(1.0, 1.0) -> 2.0`). En RMI, le même scénario donne `java.rmi.ConnectException`.
+
+Piège observé : mes deux premières demandes, publiées avant le premier lancement du consommateur,
+ont été perdues. Aucune file n'était encore liée à l'échange fanout, et le courtier a pourtant
+confirmé la publication. Le consommateur doit avoir déclaré sa file au moins une fois.
+
+### 8.2 Effort pour ajouter un traitement
+
+Ajout du consommateur d'audit (`audit.csv`) : **0 fichier existant modifié**, 1 classe ajoutée
+(`AuditConsommateur.java`, environ 80 lignes), vérifié avec `git status` après un commit de l'état
+précédent. En RMI, il aurait fallu modifier le serveur (`CalculatorServiceImpl.recordHistory()`
+ou `HistoryServiceImpl.record()`) puis le redémarrer.
+
+### 8.3 Complexité du test d'intégration
+
+En RMI et en REST, le test vérifie directement la valeur renvoyée. En événementiel, un test qui
+vérifie juste après la publication a échoué (`aucun résultat reçu ... expected: not <null>`),
+alors que le consommateur avait bien calculé le résultat, quelques millisecondes trop tard.
+Avec une attente bornée (`await().atMost(Duration.ofSeconds(5))`, Awaitility), le test a réussi
+7 fois sur 7.
+
+### 8.4 Visibilité d'un résultat immédiat
+
+L'équivalent du retour de `add(a, b)` n'existe plus : `Producteur.publier()` renvoie seulement
+l'identifiant de l'opération. Le résultat est reconstitué après coup par `CorrelateurResultats`,
+qui associe chaque `OperationCalculee` à sa demande grâce à cet identifiant, avec une attente
+de 5 s au plus. Une erreur métier n'est plus une exception ni un code 422 : c'est un événement
+dont le statut vaut `ERREUR`.
+
+## 9. Synthèse
+
+| Critère | RMI | REST | Événementiel (RabbitMQ) |
+| --- | --- | --- | --- |
+| Communication | Appels de méthodes distantes | HTTP | Événements via un courtier (AMQP) |
+| Format principal | Objets/classes Java | JSON | JSON |
+| Dépendance au langage | Forte (Java) | Indépendant | Indépendant (tout client AMQP) |
+| Contrat | Interface Java | Ressources + HTTP + JSON | Schéma des événements + échanges/files |
+| Gestion des erreurs | Exceptions / RemoteException | Codes HTTP + JSON | Événement `statut: ERREUR` |
+| Performance mesurée | 0,733777 ms/appel | 5,966458 ms/appel | Non mesurée |
+| Couplage temporel | Fort : serveur requis pendant l'appel | Fort : serveur requis pendant la requête | Faible : la demande attend dans une file durable |
+| Ajout d'un traitement (audit) | Modifier le serveur et redémarrer | Modifier `OperationService` | 0 fichier modifié, 1 classe ajoutée |
+| Test d'intégration | Assertion directe | Assertion directe | Attente bornée obligatoire (assertion immédiate : échec) |
+| Résultat immédiat pour l'appelant | Oui : retour de `add(a, b)` | Oui : corps de la réponse 201 | Non : identifiant seulement, résultat par corrélation |
 
 ---
 
-## 9. Conclusion
+## 10. Conclusion
 
-L'expérimentation montre deux styles d'architecture différents.
+L'expérimentation montre trois styles d'architecture différents.
 
 RMI propose une abstraction proche de l'appel de méthode Java et permet au client de manipuler directement une interface distante. Cette approche est particulièrement intégrée à l'écosystème Java.
 
 REST expose au contraire des ressources accessibles par HTTP. L'utilisation des méthodes HTTP, des codes de statut et de JSON permet de construire une interface indépendante du langage du client.
 
 Dans notre expérimentation, les 100 appels mesurés ont donné un temps moyen de **0,733777 ms pour RMI** et de **5,966458 ms pour REST**. Ces valeurs correspondent à l'environnement de test utilisé et doivent être interprétées comme des observations expérimentales.
+
+L'implémentation événementielle supprime le couplage temporel et permet d'ajouter un traitement (l'audit) sans modifier le code existant. En contrepartie, l'appelant n'obtient plus de résultat immédiat : il doit le reconstituer par corrélation, et les tests doivent attendre l'événement avec un délai borné.
 
 Le choix entre les deux approches dépend donc du contexte du système, notamment du niveau d'interopérabilité recherché, du type de clients, du contrat souhaité et des contraintes de communication.
