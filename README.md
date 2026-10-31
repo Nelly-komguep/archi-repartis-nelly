@@ -13,5 +13,6 @@ mvn -q compile exec:java "-Dexec.mainClass=com.nelly.evenementiel.Producteur"   
 
 mvn test                   # prérequis : courtier + CalculConsommateur lancés
 
-Détails du module (flux, garanties de livraison, tests) : [`evenementiel/README.md`](evenementiel/README.md).
 ```
+
+Détails du module (flux, garanties de livraison, tests) : [`evenementiel/README.md`](evenementiel/README.md).
