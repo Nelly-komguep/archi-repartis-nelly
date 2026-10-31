@@ -1,0 +1,6 @@
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"     # port AMQP : c'est par là que ton code Java parlera au courtier
+      - "15672:15672"   # interface web d'administration
