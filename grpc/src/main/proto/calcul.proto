@@ -1,0 +1,22 @@
+// calcul.proto
+syntax = "proto3";
+
+option java_package = "com.nelly.grpc";
+option java_multiple_files = true;
+
+service ServiceCalcul {
+  rpc Additionner (OperationRequest) returns (OperationResponse);
+  rpc HistoriqueEnFlux (HistoriqueRequest) returns (stream OperationResponse); // bonus streaming
+}
+
+message OperationRequest {
+  double a = 1;
+  double b = 2;
+}
+
+message OperationResponse {
+  double resultat = 1;
+  string id_operation = 2;
+}
+
+message HistoriqueRequest {}
