@@ -1,0 +1,17 @@
+# Cartographie du couplage actuel (séance 9, partie B)
+
+Scénario retenu : **n° 1, migrer le service de calcul RMI vers un contrat gRPC stable, sans interrompre les clients existants.**
+
+| Composant | Couplage temporel | Couplage technologique | Couplage de contrat |
+|---|---|---|---|
+| **Service RMI** (`rmi/server`) | **Fort** : `Client.java` fait `registry.lookup("CalculatorService")` sur `localhost:1099` puis des appels synchrones ; si `Server` est arrêté, chaque appel lève une `RemoteException` (constaté en séance 3). | **Fort** : `CalculatorService extends java.rmi.Remote` et chaque méthode déclare `throws RemoteException` ; le client doit être en Java et avoir la même interface (package `server`) dans son classpath. | **Fort** : le contrat est l'interface Java elle-même (`double add(double a, double b)`…) ; renommer une méthode ou ajouter un paramètre oblige à recompiler tous les clients. |
+| **Callbacks RMI** (`HistoryService`, `NotificationListener`) | **Fort, dans les deux sens** : avec `subscribe(NotificationListener)`, le serveur rappelle le client ; si le client disparaît, `onNewOperation` échoue côté serveur. | **Fort** : le client exporte lui-même un objet `Remote` (`ClientNotificationListener`) et devient serveur RMI à son tour. | **Fort** : `void onNewOperation(String entry)` est partagé par les deux côtés ; l'entrée est une `String` sans structure. |
+| **Service REST** (`rest/`) | **Fort** : `POST /operations` attend la réponse 201 ; si Spring Boot n'écoute pas sur 8080, la requête échoue immédiatement. | **Faible** : HTTP/1.1 + JSON, appelés depuis curl, Postman, PowerShell (`benchmark-rest.ps1`) ou `HttpClient` Java ; la dépendance Spring ne concerne que le serveur. | **Fort mais implicite** : les champs `"type"`, `"a"`, `"b"` (`OperationRequest`) et `"result"` (`OperationDTO`) ne figurent dans aucun contrat formel ; renommer `result` casse `BenchmarkRest` (`contains("\"result\":8.0")`) sans erreur de compilation. |
+| **Événementiel** (`evenementiel/`) | **Faible** : la file `calcul.demandes.calculateur` est durable et les messages persistants ; le producteur publie même si `CalculConsommateur` est arrêté (constaté en séance 7). | **Faible côté client, forte dépendance d'infrastructure** : AMQP + JSON sont multi-langages, mais tout dépend du courtier RabbitMQ (`docker-compose.yml`, `amqp-client` dans le pom). | **Faible** : `Topologie.JSON` a `FAIL_ON_UNKNOWN_PROPERTIES = false` (lecteur tolérant) ; ajouter un champ à `OperationDemandee` ne casse pas les consommateurs. |
+| **Service gRPC** (`grpc/`) | **Fort** : `newBlockingStub(canal).additionner(...)` attend la réponse ; si `ServeurGrpc` (50051) est arrêté, l'appel échoue avec `UNAVAILABLE`. | **Faible** : `calcul.proto` est neutre vis-à-vis du langage (client Python ou Go générable) ; côté build, le pom dépend de `protoc` et `os-maven-plugin`. | **Fort mais évolutif** : contrat explicite et typé (`double a = 1; double b = 2;`) ; ajouter un champ avec un nouveau numéro reste compatible, changer un numéro ou un type casse les clients. |
+
+## Ce que montre la cartographie
+
+- RMI est le **seul composant fort sur les trois axes** : c'est la bonne cible de migration.
+- gRPC supprime le couplage **technologique** (fin du Java obligatoire) et rend le couplage de **contrat** explicite et versionnable.
+- Le couplage **temporel** reste fort, gRPC étant aussi synchrone : ce point est assumé dans les conséquences de l'[ADR-0001](adr/0001-migration-rmi-vers-grpc.md).
