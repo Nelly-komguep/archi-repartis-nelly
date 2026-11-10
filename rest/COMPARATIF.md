@@ -261,13 +261,13 @@ Une collection Postman a été créée pour tester automatiquement le service RE
 
 Elle contient sept requêtes :
 
-1. `POST Addition - 201`
-2. `POST Division par zéro - 422`
-3. `POST Champ manquant - 400`
-4. `GET Toutes les opérations - 200`
-5. `GET Opération existante - 200`
-6. `GET Opération inexistante - 404`
-7. `GET Même opération - Idempotence`
+1. `POST Addition 201`
+2. `POST Division par zéro 422`
+3. `POST Champ manquant 400`
+4. `GET Toutes les opérations 200`
+5. `GET Opération existante 200`
+6. `GET Opération inexistante 404`
+7. `GET Même opération Idempotence`
 
 Des scripts de test Postman vérifient automatiquement les codes HTTP et certains éléments des réponses.
 
@@ -365,3 +365,108 @@ Dans notre expérimentation, les 100 appels mesurés ont donné un temps moyen d
 L'implémentation événementielle supprime le couplage temporel et permet d'ajouter un traitement (l'audit) sans modifier le code existant. En contrepartie, l'appelant n'obtient plus de résultat immédiat : il doit le reconstituer par corrélation, et les tests doivent attendre l'événement avec un délai borné.
 
 Le choix entre les deux approches dépend donc du contexte du système, notamment du niveau d'interopérabilité recherché, du type de clients, du contrat souhaité et des contraintes de communication.
+
+---
+
+## 11. Quatrième paradigme et mesures comparatives (séance 8)
+
+Le module `/grpc` réimplémente le service avec gRPC : contrat `calcul.proto`, méthode unaire
+`Additionner` et méthode bonus en streaming serveur `HistoriqueEnFlux`. Les classes Java
+(`OperationRequest`, `OperationResponse`, `ServiceCalculGrpc`) sont générées par
+`protobuf-maven-plugin` à chaque `mvn compile`.
+
+### 11.1 Protocole de mesure
+
+| Élément | Valeur |
+| --- | --- |
+| Machine | PC Windows (DESKTOP-P652UJ6), processeur Intel Core i5-10310U @ 1,70 GHz, RAM : 32 Go, Windows 11 64 bits (25H2) |
+| JVM | Java 17 |
+| Réseau | tout en `localhost` (aucun réseau externe) ; RabbitMQ dans Docker Desktop |
+| Opération | `add(3, 5)` (événementiel : publication `ADD 3 5` → réception du résultat corrélé) |
+| Chauffe | 10 appels ignorés |
+| Mesure | 100 appels successifs, chronométrés un par un avec `System.nanoTime()` |
+| Répétitions | 3 exécutions par variante (2 seulement pour RMI) ; on retient la médiane des 3 moyennes (moyenne des 2 essais pour RMI) |
+| Programmes | `BenchmarkRMIProtocole`, `BenchmarkRest` (Java `HttpClient`, HTTP/1.1), `BenchmarkGrpc`, `BenchmarkEvenementiel` — même structure pour les 4 |
+| Taille réseau | Wireshark, interface « Adapter for loopback traffic capture », pendant une exécution complète du benchmark (110 appels) ; Statistiques → Conversations → TCP ; total des octets ÷ 110 |
+| Lignes de code | lignes non vides et hors commentaires, code métier + infrastructure minimale ; exclus : code généré (`target/`), benchmarks, tests, documentation |
+
+Le benchmark REST est réécrit en Java : l'ancien script PowerShell (`Invoke-RestMethod`, séance 4)
+ajoutait son propre surcoût et n'était pas comparable. Les valeurs de la séance 4
+(RMI 0,73 ms, REST 5,97 ms, 1 seul appel de chauffe) ne sont donc pas reprises ici.
+
+Limites : machine de développement non isolée ; le 1er essai gRPC a été fait la veille des deux
+autres ; un écart inférieur à la variation entre deux essais (≈ 0,5 ms) n'est pas significatif.
+
+### 11.2 Latence par appel (ms)
+
+| Essai | RMI | REST | gRPC | Événementiel |
+| --- | ---: | ---: | ---: | ---: |
+| 1 — moyenne | 0,200 | 2,287 | 2,264 | 33,497 |
+| 2 — moyenne | 0,165 | 2,297 | 2,762 | 34,506 |
+| 3 — moyenne | — | 2,369 | 2,569 | 33,304 |
+| Médiane des moyennes | **≈ 0,18** | **2,297** | **2,569** | **33,497** |
+| Plage des médianes | 0,158 – 0,191 | 2,182 – 2,232 | 2,217 – 2,685 | 32,010 – 34,061 |
+
+### 11.3 Taille des messages (Wireshark, benchmark de 110 appels)
+
+| | Paquets | Octets | Paquets / appel | Octets / aller-retour | Connexions TCP |
+| --- | ---: | ---: | ---: | ---: | --- |
+| RMI | 498 | ≈ 32 ko | ≈ 4,5 | ≈ 290 | 2 : registre (1099) + objet distant (port aléatoire) |
+| gRPC | 465 | ≈ 36 ko | ≈ 4,2 | ≈ 330 | 1 : connexion HTTP/2 réutilisée |
+| REST | 891 | ≈ 85 ko | ≈ 8,1 | ≈ 770 | 2 : Tomcat ferme la connexion après 100 requêtes |
+| Événementiel | 1 414 | ≈ 229 ko | ≈ 12,9 | ≈ 2 080 | 3 : producteur, corrélateur, consommateur |
+
+Les octets comprennent les en-têtes IP/TCP et l'ouverture des connexions, répartis sur les
+110 appels (même règle pour les 4). Fichiers de capture et captures d'écran : dossier `captures/`.
+
+### 11.4 Lignes de code
+
+| | Lignes | Détail | pom.xml |
+| --- | ---: | --- | ---: |
+| RMI | 283 | serveur 162 + client interactif 121 (callbacks à part : 25) | 18 |
+| REST | 344 | dont 150 de DTO / modèle (getters, setters, constructeurs) | 54 |
+| Événementiel | 319 | + 6 lignes de `docker-compose.yml` | 64 |
+| gRPC | 105 | `.proto` 16 + Java 89 | 77 |
+
+gRPC n'implémente que l'addition : la comparaison n'est pas à fonctionnalités égales. Le point
+qui reste vrai : 16 lignes de `.proto` génèrent tout le code de sérialisation, écrit à la main en REST.
+
+### 11.5 Complexité perçue (1 = trivial, 5 = complexe)
+
+| | Note | Justification |
+| --- | ---: | --- |
+| RMI | 2 | Contrat = interface Java, aucune dépendance ; pièges : port aléatoire de l'objet, adresse `172.21.112.1` annoncée dans le stub, serveur lancé en double. |
+| REST | 2 | Spring Boot démarre seul, test facile (Postman) ; mais beaucoup de code répétitif (DTO) et codes d'erreur gérés à la main. |
+| gRPC | 3 | Peu de code (généré), mais configuration Maven la plus lourde (plugins protoc, 1er build de 3 min) et modèle `StreamObserver` à maîtriser. |
+| Événementiel | 4 | Courtier Docker, 3 processus à lancer dans l'ordre, messages perdus tant que la file n'est pas déclarée, corrélation manuelle, tests asynchrones. |
+
+### 11.6 Analyse
+
+- **RMI est le plus rapide, de loin** (≈ 0,18 ms, environ 12 fois moins que REST et gRPC), alors
+  que son volume réseau est proche de celui de gRPC (≈ 290 contre ≈ 330 octets). Ce n'est donc pas
+  la taille des messages qui fait la latence ici, mais le traitement de chaque côté : socket direct et
+  sérialisation Java pour RMI, pile HTTP (Tomcat/Spring, Netty/HTTP/2) pour REST et gRPC.
+- **REST et gRPC sont à égalité en latence** sur cette machine : l'écart (≈ 0,3 ms) est plus petit que
+  la variation entre deux essais de gRPC. En revanche, **REST envoie 2,3 fois plus d'octets et 2 fois
+  plus de paquets** : en-têtes HTTP/1.1 en texte répétés à chaque requête, JSON verbeux. Sur un
+  vrai réseau ou avec de gros volumes, cet écart compterait ; en local, il ne coûte presque rien.
+- **L'événementiel est environ 15 fois plus lent que REST/gRPC** et transporte 7 fois plus d'octets
+  que RMI : chaque calcul produit 2 messages qui passent chacun 2 fois par le courtier, avec
+  confirmation de publication et messages persistants. Ce n'est pas une latence d'appel au même sens :
+  c'est le prix du découplage temporel mesuré en séance 7.
+
+### 11.7 Conclusion
+
+Si ce service de calcul devait partir en production demain, nous choisirions **gRPC**. Nos mesures
+montrent que RMI est de loin le plus rapide (≈ 0,18 ms), mais il impose des clients Java et nous a
+déjà posé un problème d'adresse réseau en local (objet exporté sur `172.21.112.1`, port aléatoire),
+ce qui deviendrait un obstacle derrière un pare-feu. Entre les deux protocoles HTTP, la latence est
+identique sur notre machine (2,3 ms pour REST, 2,6 ms pour gRPC, écart inférieur à la variation entre
+essais), mais gRPC transporte **2,3 fois moins d'octets et 2 fois moins de paquets** que REST
+(≈ 330 contre ≈ 770 octets par appel, une seule connexion réutilisée), avec un contrat `.proto` typé de
+16 lignes qui génère le client dans n'importe quel langage, et le streaming de l'historique sans
+code supplémentaire. Ce choix a un coût mesuré : la configuration la plus lourde (pom de 77 lignes,
+note de complexité 3/5) et des messages illisibles sans outil. L'événementiel, à 33 ms et 2 080 octets
+par calcul, ne convient pas à un service où l'appelant attend le résultat immédiatement ; nous le
+garderions pour les traitements annexes comme l'audit. Si les clients étaient des navigateurs ou des
+partenaires externes, REST resterait le choix raisonnable, puisqu'il ne coûte rien de plus en latence.
